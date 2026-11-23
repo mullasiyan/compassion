@@ -1,6 +1,10 @@
 // Client-side instant PDF fallback download for zero-failure demo reliability
 
-export function downloadClientPdfFallback(caseId: string = 'run-rahul-0921') {
+export function downloadClientPdfFallback(caseId: string = 'run-rahul-0921', isApproved: boolean = false) {
+  const signatureLine = isApproved
+    ? 'Coordinator Sign-off: Signed: Lead Coordinator Alex V. | Authorization Confirmed'
+    : 'Coordinator Sign-off: Pending coordinator approval';
+
   const content = `%PDF-1.4
 1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
 2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
@@ -20,7 +24,8 @@ BT
 0 -18 Td (- Sighting #3 (Distant Airport): FLAGGED UNVERIFIED (Score: 0.28, Improbable Velocity)) Tj
 0 -30 Td (FIELD COORDINATION & ETHICAL COMPLIANCE:) Tj
 0 -18 Td (- 8 Authorized Volunteer Responders Active across 4 Quadrants (Zero Overlap)) Tj
-0 -18 Td (- Certified: Zero Facial Recognition, Live Coordinates Redacted, Coordinator Signed) Tj
+0 -18 Td (- Certified: Zero Facial Recognition, Live Coordinates Redacted) Tj
+0 -18 Td (- ${signatureLine}) Tj
 ET
 endstream endobj
 5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj

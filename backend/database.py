@@ -225,6 +225,11 @@ def get_pending_approvals(case_id: str) -> List[Dict[str, Any]]:
         rows = conn.execute("SELECT * FROM approvals WHERE case_id = ? AND status = 'pending'", (case_id,)).fetchall()
         return [dict(r) for r in rows]
 
+def get_approvals(case_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM approvals WHERE case_id = ? ORDER BY created_at DESC", (case_id,)).fetchall()
+        return [dict(r) for r in rows]
+
 # --- Blackboard: Notifications ---
 
 def insert_notification(case_id: str, recipient: str, channel: str, subject: str, message: str, status: str = 'staged') -> int:

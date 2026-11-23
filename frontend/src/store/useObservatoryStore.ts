@@ -4,7 +4,7 @@ import { SCRIPTED_RAHUL_DEMO, AGENT_REGISTRY } from '../mock/scriptedDemo';
 import { sound } from '../utils/audio';
 
 interface ObservatoryStore {
-  screen: 'launch' | 'observatory';
+  screen: 'launch' | 'observatory' | 'how-it-works';
   roleView: RoleView;
   streamMode: 'mock' | 'live';
   isLiveConnected: boolean;
@@ -21,7 +21,7 @@ interface ObservatoryStore {
   activeParticles: MessageParticle[];
 
   // Actions
-  setScreen: (screen: 'launch' | 'observatory') => void;
+  setScreen: (screen: 'launch' | 'observatory' | 'how-it-works') => void;
   setRoleView: (view: RoleView) => void;
   toggleStreamMode: () => void;
   setPlaying: (playing: boolean) => void;

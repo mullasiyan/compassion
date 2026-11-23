@@ -4,33 +4,48 @@
 
 :root {
   /* ==================================================================== */
-  /* DESIGN TOKENS: LOSTLINK AGENT OBSERVATORY                            */
+  /* DESIGN TOKENS: LOSTLINK SOLAR SYSTEM OBSERVATORY                      */
   /* ==================================================================== */
-  --bg-deep-space: #03060E;
-  --bg-void: #060A17;
-  --bg-panel: rgba(9, 14, 28, 0.78);
+  
+  /* Deep Space Cosmic Canvas */
+  --bg-deep-space: #02040A;
+  --bg-space-void: #050814;
+  --bg-space-nebula: #080D21;
+  --bg-panel: rgba(6, 10, 24, 0.76);
   --bg-panel-border: rgba(255, 255, 255, 0.08);
 
-  /* 6 Agent Signature Colors */
-  --agent-orchestrator: #00F0FF;
-  /* Electric Cyan (Commander) */
-  --agent-report: #38BDF8;
-  /* Sky Cyan (Intake & Urgency) */
-  --agent-verification: #FFB800;
-  /* Amber Gold (Critic & Sighting Auditor) */
-  --agent-search: #A855F7;
-  /* Ultra Violet (Spatial Strategist) */
-  --agent-rescue: #00FF9D;
-  /* Emerald Lime (Field Dispatcher) */
-  --agent-family: #FF007A;
-  /* Hyper Magenta (Family Liaison) */
+  /* Central Solar Anchor (The Sun / Orchestrator) */
+  --sun-core: #FFFBEB;
+  --sun-corona: #F59E0B;
+  --sun-flare: #D97706;
+  --sun-radiance: rgba(245, 158, 11, 0.35);
 
-  /* System States */
+  /* 6 Agent Celestial Bodies & Signature Colors */
+  --agent-orchestrator: #00F0FF;     /* The Sun (Electric Cyan core with Gold Corona) */
+  --agent-report: #38BDF8;           /* Mercury (Sky Cyan mineral & high speed orbit) */
+  --agent-verification: #FFB800;     /* Venus (Amber Gold thick atmosphere, The Critic) */
+  --agent-search: #A855F7;           /* Earth (Ultra Violet & Cyan ocean terran sphere) */
+  --agent-rescue: #00FF9D;           /* Mars (Emerald Lime field sweep & rust orange surface) */
+  --agent-family: #FF007A;           /* Saturn (Hyper Magenta majesty with golden rings) */
+
+  /* Cosmic Signals & Phenomenon */
+  --comet-head: #FFFFFF;
+  --comet-tail: rgba(0, 240, 255, 0.65);
+  --asteroid-fire: #EF4444;
+  --asteroid-rock: #78716C;
+  --eclipse-halo: #F59E0B;
+  --eclipse-dark: #010206;
+
+  /* Orbital Trajectory Lines */
+  --orbit-track: rgba(255, 255, 255, 0.07);
+  --orbit-active: rgba(0, 240, 255, 0.25);
+
+  /* Celestial System States */
   --state-idle: #64748B;
   --state-thinking: #00F0FF;
   --state-working: #00FF9D;
   --state-failed: #EF4444;
-  --state-done: #10B981;
+  --state-done: #F59E0B;
   --state-hold: #FFB800;
 
   /* Typography Fallbacks */
@@ -47,31 +62,53 @@ body {
   font-family: var(--font-body);
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
-/* Glassmorphism Panels */
+/* Solar Glassmorphism Panels */
 .glass-panel {
   background: var(--bg-panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--bg-panel-border);
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.55);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+}
+
+.glass-panel-solar {
+  background: rgba(12, 16, 32, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 35px rgba(245, 158, 11, 0.18), 0 12px 48px rgba(0, 0, 0, 0.7);
 }
 
 .glass-panel-glow {
   background: var(--bg-panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 240, 255, 0.25);
-  box-shadow: 0 0 25px rgba(0, 240, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.18), 0 8px 32px rgba(0, 0, 0, 0.65);
 }
 
-.glass-hold-glow {
-  background: rgba(22, 17, 7, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 184, 0, 0.45);
-  box-shadow: 0 0 45px rgba(255, 184, 0, 0.25), 0 16px 48px rgba(0, 0, 0, 0.8);
+.glass-hold-eclipse {
+  background: rgba(10, 6, 2, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 50px rgba(245, 158, 11, 0.35), 0 20px 60px rgba(0, 0, 0, 0.9);
+}
+
+/* Solar Mission Log & HUD Badges */
+.mission-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.1);
+  color: #FBBF24;
 }
 
 /* Scrollbars */
@@ -81,32 +118,59 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(2, 4, 10, 0.4);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(245, 158, 11, 0.4);
 }
 
-@keyframes pulseGlow {
-
-  0%,
-  100% {
-    opacity: 0.8;
+/* Animations */
+@keyframes solarCoronaPulse {
+  0%, 100% {
     transform: scale(1);
+    opacity: 0.85;
   }
-
   50% {
+    transform: scale(1.08);
     opacity: 1;
-    transform: scale(1.04);
   }
 }
 
-.pulse-glow {
-  animation: pulseGlow 2.5s infinite ease-in-out;
+.solar-pulse {
+  animation: solarCoronaPulse 4s infinite ease-in-out;
+}
+
+@keyframes flareRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.flare-spin {
+  animation: flareRotate 60s infinite linear;
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .solar-pulse,
+  .flare-spin {
+    animation: none !important;
+  }
 }

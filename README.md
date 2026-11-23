@@ -153,8 +153,8 @@ LostLink enforces non-negotiable safety guardrails directly inside code:
   - Show the **Approval Gate modal**: highlight the drafted family memo, the privacy redaction check, and the coordinator override controls.
   - Click **"Edit Text"** or click **"Approve & Mobilize"**. The hold is released, volunteer tasks mobilize, and an encrypted memo dispatches to the Guardian Portal.
 - **3:30 - 4:00 | Analytics & PDF Dossier:**
-  - Open **"📊 Analytics & PDF"**: review the 1 verified vs 2 flagged sightings, the 12s time to first zone, and the 4.5 hours saved.
-  - Click **"📄 Download PDF Case Dossier"** to reveal the certified ReportLab incident dossier.
+  - Open **"📊 Analytics & PDF"**: review real-time database metrics (verified vs flagged sightings, time to first zone, volunteer task assignments, and active search zones).
+  - Click **"📄 Download PDF Case Dossier"** to generate the official ReportLab incident dossier with coordinator sign-off status.
 
 ---
 
@@ -167,7 +167,7 @@ LostLink enforces non-negotiable safety guardrails directly inside code:
 *Answer:* Every sighting passes through the Verification Agent (Critic). It enforces two deterministic filters before any LLM call: exact text MD5 hashing (catching viral social reposts) and pedestrian velocity physics (rejecting impossible transit distances). Sightings scoring below 0.85 are permanently barred from altering search zones.
 
 **Q3: What happens if the Gemini API or network goes down on stage?**  
-*Answer:* LostLink implements a circuit-breaker with exponential backoff (0.4s, 0.8s, 1.6s). If the API is unreachable, it automatically falls back to verified cached snapshots and logs an `error_occurred` self-healing event. The demo can run 100% offline.
+*Answer:* LostLink implements a circuit-breaker with exponential backoff (0.4s, 0.8s, 1.6s). If the API is unreachable, it automatically falls back to verified cached snapshots and logs an `error_occurred` self-healing event. Demo Mode uses cached fallbacks to provide offline resilience when external APIs are unavailable.
 
 **Q4: How do the agents coordinate without race conditions?**  
 *Answer:* All agents communicate through a centralized SQLite "blackboard" (`cases`, `tasks`, `sightings`, `search_zones`). The Orchestrator manages state progression and dependencies; worker agents read their assigned tasks and write results back to the shared blackboard, driving the visual particle network.

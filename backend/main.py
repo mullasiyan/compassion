@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import asyncio
+from datetime import datetime
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +12,7 @@ from dotenv import load_dotenv
 
 from backend.database import (
     init_db, insert_case, get_case, get_events_by_case, get_search_zones,
-    get_tasks, get_sightings, resolve_approval, get_pending_approvals,
+    get_tasks, get_sightings, get_approvals, resolve_approval, get_pending_approvals,
     insert_notification, dispatch_notification, get_notifications,
     log_event, log_audit
 )
@@ -139,7 +140,7 @@ async def decide_approval(case_id: str, request_id: str, req: ApprovalDecisionRe
             "agent": "orchestrator",
             "event_type": "decision_made",
             "title": f"Approval Confirmed by {coordinator}",
-            "summary": "Coordinator clicked Approve. Family update dispatched and 8 volunteer tasks mobilized.",
+            "summary": "Coordinator clicked Approve. Family update dispatched and volunteer tasks mobilized.",
             "payload": {
                 "decision": decision,
                 "signed_by": coordinator,
@@ -156,12 +157,12 @@ async def decide_approval(case_id: str, request_id: str, req: ApprovalDecisionRe
                     "from": "orchestrator",
                     "to": "rescue_coordination",
                     "label": "Release Volunteer Tasks",
-                    "payloadPreview": "AUTHORIZED: Mobilize 8 Field Volunteers"
+                    "payloadPreview": "AUTHORIZED: Mobilize Field Volunteers"
                 }
             ],
             "thoughtTrace": {
                 "agent": "orchestrator",
-                "reasoning": f"Human coordinator sign-off confirmed by {coordinator}. Releasing held actions: sent encrypted family dispatch and activated Zone Beta volunteer sweeps.",
+                "reasoning": f"Human coordinator sign-off confirmed by {coordinator}. Releasing held actions: sent encrypted family dispatch and activated volunteer sweeps.",
                 "toolsCalled": [{"name": "gatekeeper.release", "params": f"signed_by='{coordinator}'", "output": "Approved"}],
                 "confidence": 1.0,
                 "alternatives": []
@@ -195,63 +196,73 @@ async def decide_approval(case_id: str, request_id: str, req: ApprovalDecisionRe
         await broadcast_event(reject_event)
         return {"status": "rejected", "message": "Gate rejected. Dispatch cancelled."}
 
-# --- PDF Case Dossier Download ---
+# --- PDF Case Dossier Download (Real Data & Real Approvals Only) ---
 
 @app.get("/api/cases/{case_id}/report.pdf")
 def download_case_pdf(case_id: str):
     case = get_case(case_id) or {
         "case_id": case_id,
-        "name": "Rahul",
-        "age": 16,
-        "last_seen_time": "4:30 PM",
-        "last_seen_location": "College Bus Stop",
-        "clothing": "Royal blue shirt, black trousers",
-        "urgency": "CRITICAL"
+        "name": "Unregistered Case",
+        "age": 0,
+        "last_seen_time": "-",
+        "last_seen_location": "-",
+        "clothing": "-",
+        "urgency": "PENDING"
     }
     zones = get_search_zones(case_id)
     tasks = get_tasks(case_id)
     sightings = get_sightings(case_id)
+    approvals = get_approvals(case_id)
 
-    pdf_bytes = generate_case_pdf_report(case, zones, tasks, sightings)
+    pdf_bytes = generate_case_pdf_report(case, zones, tasks, sightings, approvals)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=LostLink-Case-{case_id}.pdf"}
     )
 
-# --- Lean Analytics Panel Endpoint ---
+# --- Real-Time Analytics Endpoint (Real Database Values Only) ---
 
 @app.get("/api/cases/{case_id}/analytics")
 def get_case_analytics(case_id: str):
+    case = get_case(case_id)
     sightings = get_sightings(case_id)
+    tasks = get_tasks(case_id)
+    zones = get_search_zones(case_id)
+
+    # Compute strictly real counts; 0 when empty
+    total_sightings = len(sightings)
     verified_count = sum(1 for s in sightings if s.get("status") == "verified")
     flagged_dup = sum(1 for s in sightings if s.get("status") == "flagged_duplicate")
     flagged_unver = sum(1 for s in sightings if s.get("status") == "flagged_unverified")
 
-    tasks = get_tasks(case_id)
+    total_tasks = len(tasks)
     completed_tasks = sum(1 for t in tasks if t.get("status") == "completed")
+    in_progress_tasks = sum(1 for t in tasks if t.get("status") == "in_progress")
+    pending_tasks = sum(1 for t in tasks if t.get("status") == "pending")
+
+    # Real time to first search plan calculation
+    time_to_first_plan = 0
+    if case and zones:
+        try:
+            case_time = datetime.fromisoformat(case["created_at"].replace("Z", "").split(".")[0])
+            first_zone_time = datetime.fromisoformat(zones[-1]["created_at"].replace("Z", "").split(".")[0])
+            time_to_first_plan = max(1, int((first_zone_time - case_time).total_seconds()))
+        except Exception:
+            time_to_first_plan = 0
 
     return {
         "case_id": case_id,
-        "total_sightings_processed": len(sightings) if sightings else 3,
-        "verified_sightings": verified_count if sightings else 1,
-        "flagged_sightings": {
-            "total_flagged": (flagged_dup + flagged_unver) if sightings else 2,
-            "duplicates": flagged_dup if sightings else 1,
-            "improbable_outliers": flagged_unver if sightings else 1
-        },
-        "time_to_first_search_plan_sec": 12,
-        "tasks_metrics": {
-            "total": len(tasks) if tasks else 4,
-            "completed": completed_tasks if tasks else 2,
-            "in_progress": len(tasks) - completed_tasks if tasks else 2,
-            "zero_duplicate_coverage": True
-        },
-        "operational_efficiency": {
-            "estimated_manual_hours_saved": "4.5 hrs",
-            "time_reduction_percent": "78%",
-            "tokens_consumed_est": 4850
-        }
+        "total_sightings": total_sightings,
+        "verified_sightings": verified_count,
+        "flagged_duplicates": flagged_dup,
+        "flagged_unverified": flagged_unver,
+        "total_tasks": total_tasks,
+        "tasks_completed": completed_tasks,
+        "tasks_in_progress": in_progress_tasks,
+        "tasks_pending": pending_tasks,
+        "active_search_zones": len(zones),
+        "time_to_first_search_plan_sec": time_to_first_plan
     }
 
 # --- Data Queries & Event Stream ---

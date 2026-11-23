@@ -9,6 +9,8 @@ import { ApprovalModal } from './components/ApprovalModal';
 import { CommandPalette } from './components/CommandPalette';
 import { RescueTeamView } from './components/RescueTeamView';
 import { FamilyPortalView } from './components/FamilyPortalView';
+import { HowItWorksView } from './components/HowItWorksView';
+import { StarfieldBackground } from './components/StarfieldBackground';
 
 export default function App() {
   const {
@@ -19,22 +21,27 @@ export default function App() {
   } = useObservatoryStore();
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#03060E] text-slate-100 select-none">
-      {/* Top Universal Mission Control Header */}
+    <div className="relative flex flex-col h-screen w-screen overflow-hidden bg-[#02040A] text-slate-100 select-none">
+      {/* 3-Layer Parallax Starfield & Cosmic Nebula Background */}
+      <StarfieldBackground />
+
+      {/* Top Universal Mission Control Header (Contains Permanent Safety Banner) */}
       <Header />
 
       {/* Main View Router */}
-      <main className="relative flex-1 w-full h-[calc(100vh-80px)] overflow-hidden">
+      <main className="relative flex-1 w-full h-[calc(100vh-80px)] overflow-hidden z-10">
         {screen === 'launch' ? (
           <LaunchScreen />
+        ) : screen === 'how-it-works' ? (
+          <HowItWorksView />
         ) : roleView === 'rescue_team' ? (
           <RescueTeamView />
         ) : roleView === 'family_portal' ? (
           <FamilyPortalView />
         ) : (
-          /* The Agent Observatory */
+          /* The Solar Observatory */
           <div className="relative w-full h-full">
-            {/* Background 60 FPS Constellation Canvas */}
+            {/* 60 FPS Solar System Canvas */}
             <ConstellationCanvas />
 
             {/* Floating Left: Case Telemetry & Sighting Injector */}
@@ -68,7 +75,7 @@ export default function App() {
 
               {/* Sighting Webhook Simulator Button */}
               <button
-                onClick={triggerSightingWebhook}
+                onClick={() => triggerSightingWebhook()}
                 className="w-full mt-2 py-2 px-3 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/40 text-purple-300 font-mono text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)]"
                 title="Simulate incoming public sighting webhook"
               >

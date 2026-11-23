@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useObservatoryStore } from '../store/useObservatoryStore';
-import L from 'leaflet';
+declare const window: any;
+const L: any = typeof window !== 'undefined' ? window.L : null;
 
 export const RescueTeamView: React.FC = () => {
   const {
@@ -12,9 +13,9 @@ export const RescueTeamView: React.FC = () => {
   } = useObservatoryStore();
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
-  const zoneBetaLayerRef = useRef<L.Circle | null>(null);
-  const sightingMarkerRef = useRef<L.Marker | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const zoneBetaLayerRef = useRef<any>(null);
+  const sightingMarkerRef = useRef<any>(null);
 
   const [activeTab, setActiveTab] = useState<'map' | 'tasks'>('map');
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
@@ -277,7 +278,7 @@ export const RescueTeamView: React.FC = () => {
                 Live Sighting Webhook Simulator
               </span>
               <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                Fire real sightings via <code className="text-cyan-300">POST /api/cases/{{id}}/sightings</code>. Watch the Critic verify or reject, then re-plan the map live.
+                Fire real sightings via <code className="text-cyan-300">POST /api/cases/&#123;id&#125;/sightings</code>. Watch the Critic verify or reject, then re-plan the map live.
               </p>
             </div>
 
