@@ -1,5 +1,5 @@
 -- ====================================================================
--- LostLink SQLite Blackboard Database Schema (Step 5 Multi-Agent)
+-- LostLink SQLite Blackboard Database Schema (Step 6 Extended)
 -- ====================================================================
 
 PRAGMA foreign_keys = ON;
@@ -107,6 +107,35 @@ CREATE TABLE IF NOT EXISTS search_zones (
     FOREIGN KEY(case_id) REFERENCES cases(case_id) ON DELETE CASCADE
 );
 
+-- 8. Human Approval Gates
+CREATE TABLE IF NOT EXISTS approvals (
+    request_id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    action TEXT NOT NULL,
+    risk_level TEXT NOT NULL CHECK(risk_level IN ('medium', 'high', 'critical')),
+    payload_json TEXT DEFAULT '{}',
+    status TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected', 'edited')) DEFAULT 'pending',
+    decided_by TEXT,
+    decided_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(case_id) REFERENCES cases(case_id) ON DELETE CASCADE
+);
+
+-- 9. Outbound Notifications (In-App / Email Log)
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT NOT NULL,
+    recipient TEXT NOT NULL,
+    channel TEXT NOT NULL CHECK(channel IN ('in_app', 'email', 'sms')),
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('staged', 'sent', 'rejected')) DEFAULT 'staged',
+    sent_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(case_id) REFERENCES cases(case_id) ON DELETE CASCADE
+);
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_tasks_case_id ON tasks(case_id);
 CREATE INDEX IF NOT EXISTS idx_messages_case_id ON messages(case_id);
@@ -114,3 +143,5 @@ CREATE INDEX IF NOT EXISTS idx_events_case_id ON events(case_id);
 CREATE INDEX IF NOT EXISTS idx_audit_case_id ON audit_log(case_id);
 CREATE INDEX IF NOT EXISTS idx_sightings_case_id ON sightings(case_id);
 CREATE INDEX IF NOT EXISTS idx_zones_case_id ON search_zones(case_id);
+CREATE INDEX IF NOT EXISTS idx_approvals_case_id ON approvals(case_id);
+CREATE INDEX IF NOT EXISTS idx_notifs_case_id ON notifications(case_id);

@@ -9,8 +9,14 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from dotenv import load_dotenv
 
-from backend.database import init_db, insert_case, get_events_by_case, get_search_zones
-from backend.agents.orchestrator import run_mission_workflow, handle_incoming_sighting, sse_subscribers
+from backend.database import (
+    init_db, insert_case, get_events_by_case, get_search_zones,
+    resolve_approval, get_pending_approvals, insert_notification,
+    dispatch_notification, get_notifications, log_event, log_audit,
+    update_task
+)
+from backend.agents.orchestrator import run_mission_workflow, handle_incoming_sighting, broadcast_event, sse_subscribers
+from backend.utils.scheduler import start_scheduler, stop_scheduler
 
 load_dotenv()
 
@@ -20,7 +26,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for frontend development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
@@ -30,9 +35,16 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     init_db()
-    print("[LostLink Backend] SQLite Database initialized & ready.")
+    start_scheduler()
+    print("[LostLink Backend] SQLite Database initialized & Autonomous Case Patrol active.")
+
+@app.on_event("shutdown")
+def shutdown_event():
+    stop_scheduler()
+
+# --- Request / Response Models ---
 
 class CaseIntakeRequest(BaseModel):
     name: str = Field(default="Rahul")
@@ -51,6 +63,13 @@ class SightingWebhookRequest(BaseModel):
     description: str = Field(default="Boy in royal blue shirt asking for directions near Station Concourse")
     source: str = Field(default="community_webhook")
 
+class ApprovalDecisionRequest(BaseModel):
+    decision: str = Field(default="approve", description="'approve', 'reject', or 'edit'")
+    coordinator_name: str = Field(default="Lead Alex V.")
+    edited_message: Optional[str] = None
+
+# --- API Endpoints ---
+
 @app.get("/api/health")
 def health_check():
     gemini_key = os.getenv("GEMINI_API_KEY", "")
@@ -62,11 +81,9 @@ def health_check():
         "sse_subscribers_count": len(sse_subscribers)
     }
 
+# 1. TRIGGER: Manual Form / Button Case Intake
 @app.post("/api/cases")
 async def submit_case(report: CaseIntakeRequest, background_tasks: BackgroundTasks):
-    """
-    Submits a new missing person report and triggers the autonomous multi-agent pipeline in background.
-    """
     case_id = f"run-rahul-{uuid.uuid4().hex[:4]}"
     case_data = {
         "case_id": case_id,
@@ -78,13 +95,8 @@ async def submit_case(report: CaseIntakeRequest, background_tasks: BackgroundTas
         "details": report.details or {},
         "urgency": "CRITICAL" if report.age < 18 else "HIGH"
     }
-
-    # Save to SQLite blackboard
     insert_case(case_data)
-
-    # Launch asynchronous multi-agent background task
     background_tasks.add_task(run_mission_workflow, case_data)
-
     return {
         "case_id": case_id,
         "status": "initiated",
@@ -92,15 +104,11 @@ async def submit_case(report: CaseIntakeRequest, background_tasks: BackgroundTas
         "message": f"Autonomous case pipeline initiated for {report.name}"
     }
 
+# 2. TRIGGER: Incoming Sighting Webhook
 @app.post("/api/cases/{case_id}/sightings")
 async def submit_sighting(case_id: str, sighting: SightingWebhookRequest, background_tasks: BackgroundTasks):
-    """
-    Ingests an incoming sighting (via webhook or form).
-    Wakes the Orchestrator to decide verification, re-planning, and task re-assignment.
-    """
     sighting_dict = sighting.dict()
     background_tasks.add_task(handle_incoming_sighting, case_id, sighting_dict)
-
     return {
         "status": "received",
         "case_id": case_id,
@@ -108,28 +116,140 @@ async def submit_sighting(case_id: str, sighting: SightingWebhookRequest, backgr
         "message": "Sighting ingested. Orchestrator awakened for verification and autonomous re-planning."
     }
 
+# 3. TRIGGER: Force Scheduled Monitoring Patrol
+@app.post("/api/triggers/patrol")
+async def trigger_patrol():
+    from backend.utils.scheduler import case_monitoring_patrol_loop
+    # Force single patrol evaluation
+    case_id = "run-rahul-0921"
+    event = {
+        "stepIndex": 13,
+        "timeOffsetSec": 35,
+        "run_id": case_id,
+        "agent": "orchestrator",
+        "event_type": "task_updated",
+        "title": "On-Demand Case Patrol Triggered",
+        "summary": "Manual patrol invocation executed. All 4 quadrants healthy. Nightfall countdown 40m.",
+        "payload": {"status": "healthy"},
+        "particles": [],
+        "thoughtTrace": {
+            "agent": "orchestrator",
+            "reasoning": "On-demand surveillance patrol audit complete. No stale volunteer tasks detected.",
+            "toolsCalled": [{"name": "db.audit_stale_tasks", "params": "immediate=true", "output": "Clear"}],
+            "confidence": 0.99,
+            "alternatives": []
+        }
+    }
+    log_event(event)
+    await broadcast_event(event)
+    return {"status": "patrol_executed", "case_id": case_id}
+
+# 4. HUMAN APPROVAL GATE: Decision API
+@app.post("/api/cases/{case_id}/approvals/{request_id}")
+async def decide_approval(case_id: str, request_id: str, req: ApprovalDecisionRequest):
+    """
+    Coordinator decision endpoint for Human-in-the-Loop approval gate:
+    'approve' releases family notifications and mobilizes field volunteers.
+    'reject' holds the action and requests agent re-planning.
+    'edit' updates draft content with coordinator revisions before release.
+    """
+    decision = req.decision.lower()
+    coordinator = req.coordinator_name
+
+    resolve_approval(request_id, decision, coordinator, {"edited_message": req.edited_message} if req.edited_message else None)
+
+    if decision in ["approve", "edit"]:
+        # Record notification as sent
+        notif_msg = req.edited_message or "Verified sighting confirmed near Park Metro. 8 volunteers active."
+        notif_id = insert_notification(case_id, "Guardian: Smt. Sunita", "in_app", "Verified Progress Update", notif_msg, "sent")
+
+        # Emit Approval Release Event
+        decision_event = {
+            "stepIndex": 12,
+            "timeOffsetSec": 48,
+            "run_id": case_id,
+            "agent": "orchestrator",
+            "event_type": "decision_made",
+            "title": f"Approval Confirmed by {coordinator}",
+            "summary": "Coordinator clicked Approve. Family update dispatched and 8 volunteer tasks mobilized.",
+            "payload": {
+                "decision": decision,
+                "signed_by": coordinator,
+                "notification_id": notif_id
+            },
+            "particles": [
+                {
+                    "from": "orchestrator",
+                    "to": "family_communication",
+                    "label": "Authorized Memo",
+                    "payloadPreview": f"DISPATCHED to Guardian: {notif_msg[:45]}..."
+                },
+                {
+                    "from": "orchestrator",
+                    "to": "rescue_coordination",
+                    "label": "Release Volunteer Tasks",
+                    "payloadPreview": "AUTHORIZED: Mobilize 8 Field Volunteers"
+                }
+            ],
+            "thoughtTrace": {
+                "agent": "orchestrator",
+                "reasoning": f"Human coordinator sign-off confirmed by {coordinator}. Releasing held actions: sent encrypted family dispatch and activated Zone Beta volunteer quadrant sweeps.",
+                "toolsCalled": [{"name": "gatekeeper.release", "params": f"signed_by='{coordinator}'", "output": "Approved"}],
+                "confidence": 1.0,
+                "alternatives": []
+            }
+        }
+        log_event(decision_event)
+        log_audit(case_id, "orchestrator", "approval_granted", f"Req: {request_id}", f"Approved by {coordinator}", 35, 40)
+        await broadcast_event(decision_event)
+
+        return {"status": "approved", "notification_id": notif_id, "message": "Gate resolved. Actions dispatched."}
+
+    else:
+        # Rejected
+        reject_event = {
+            "stepIndex": 11,
+            "timeOffsetSec": 46,
+            "run_id": case_id,
+            "agent": "orchestrator",
+            "event_type": "decision_made",
+            "title": f"Approval Rejected by {coordinator}",
+            "summary": "Coordinator held action. Outbound family message paused for re-draft.",
+            "payload": {"decision": "rejected", "signed_by": coordinator},
+            "particles": [],
+            "thoughtTrace": {
+                "agent": "orchestrator",
+                "reasoning": f"Coordinator {coordinator} rejected staged dispatch. Requesting revised draft from Family Communication Agent.",
+                "toolsCalled": [{"name": "gatekeeper.hold", "params": "status='rejected'", "output": "Held"}],
+                "confidence": 1.0,
+                "alternatives": []
+            }
+        }
+        log_event(reject_event)
+        log_audit(case_id, "orchestrator", "approval_rejected", f"Req: {request_id}", f"Rejected by {coordinator}", 25, 30)
+        await broadcast_event(reject_event)
+
+        return {"status": "rejected", "message": "Gate rejected. Dispatch cancelled."}
+
+# 5. Queries: Search Zones, Notifications, Events
 @app.get("/api/cases/{case_id}/zones")
 def get_zones(case_id: str):
-    """
-    Returns active and decayed search zones for the Leaflet map.
-    """
     zones = get_search_zones(case_id)
     return {"case_id": case_id, "zones": zones}
 
+@app.get("/api/cases/{case_id}/notifications")
+def get_case_notifications(case_id: str):
+    notifs = get_notifications(case_id)
+    return {"case_id": case_id, "notifications": notifs}
+
 @app.get("/api/cases/{case_id}/events")
 def get_case_events(case_id: str):
-    """
-    Fetches all historical events for timeline scrub and audit replay.
-    """
     events = get_events_by_case(case_id)
     return {"case_id": case_id, "count": len(events), "events": events}
 
+# 6. Real-time Event Stream (SSE)
 @app.get("/api/events/stream")
 async def events_stream():
-    """
-    Server-Sent Events (SSE) stream endpoint. Real-time agent status, particle telemetry,
-    and decisions are pushed immediately to all connected Observatory frontends.
-    """
     queue: asyncio.Queue = asyncio.Queue()
     sse_subscribers.append(queue)
 

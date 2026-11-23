@@ -172,6 +172,65 @@ def get_search_zones(case_id: str) -> List[Dict[str, Any]]:
         rows = conn.execute("SELECT * FROM search_zones WHERE case_id = ? ORDER BY priority DESC", (case_id,)).fetchall()
         return [dict(r) for r in rows]
 
+# --- Blackboard: Approval Gates ---
+
+def create_approval(request_id: str, case_id: str, agent: str, action: str, risk_level: str, payload: Dict[str, Any]):
+    with get_db() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO approvals (request_id, case_id, agent, action, risk_level, payload_json, status)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending')""",
+            (request_id, case_id, agent, action, risk_level, json.dumps(payload))
+        )
+        conn.commit()
+
+def resolve_approval(request_id: str, status: str, decided_by: str, edited_payload: Dict[str, Any] = None):
+    with get_db() as conn:
+        if edited_payload:
+            conn.execute(
+                """UPDATE approvals 
+                   SET status = ?, decided_by = ?, payload_json = ?, decided_at = CURRENT_TIMESTAMP 
+                   WHERE request_id = ?""",
+                (status, decided_by, json.dumps(edited_payload), request_id)
+            )
+        else:
+            conn.execute(
+                """UPDATE approvals 
+                   SET status = ?, decided_by = ?, decided_at = CURRENT_TIMESTAMP 
+                   WHERE request_id = ?""",
+                (status, decided_by, request_id)
+            )
+        conn.commit()
+
+def get_pending_approvals(case_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM approvals WHERE case_id = ? AND status = 'pending'", (case_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+# --- Blackboard: Notifications ---
+
+def insert_notification(case_id: str, recipient: str, channel: str, subject: str, message: str, status: str = 'staged') -> int:
+    with get_db() as conn:
+        cursor = conn.execute(
+            """INSERT INTO notifications (case_id, recipient, channel, subject, message, status)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (case_id, recipient, channel, subject, message, status)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def dispatch_notification(notif_id: int):
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE notifications SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (notif_id,)
+        )
+        conn.commit()
+
+def get_notifications(case_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM notifications WHERE case_id = ? ORDER BY created_at DESC", (case_id,)).fetchall()
+        return [dict(r) for r in rows]
+
 # --- Blackboard: Event Stream & Audit Helpers ---
 
 def log_event(event_dict: Dict[str, Any]):
@@ -229,4 +288,4 @@ def get_events_by_case(case_id: str) -> List[Dict[str, Any]]:
 
 if __name__ == "__main__":
     init_db()
-    print("LostLink SQLite database initialized with full Step 5 blackboard tables.")
+    print("LostLink SQLite database initialized with Step 6 approvals and notifications.")

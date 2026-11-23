@@ -35,10 +35,11 @@ interface ObservatoryStore {
   toggleDemoMode: () => void;
   toggleCommandPalette: () => void;
   triggerSimulateFailure: () => void;
-  approveGate: () => void;
-  rejectGate: () => void;
-  triggerSightingWebhook: () => void;
+  approveGate: (editedText?: string) => Promise<void>;
+  rejectGate: () => Promise<void>;
+  triggerSightingWebhook: (type?: string) => Promise<void>;
   triggerLiveBackendCase: () => Promise<void>;
+  triggerPatrolCheck: () => Promise<void>;
   ingestLiveEvent: (event: ScriptedEvent) => void;
   resetRun: () => void;
 }
@@ -143,9 +144,15 @@ export const useObservatoryStore = create<ObservatoryStore>((set, get) => ({
       sound.playAgentPulse();
     }
 
+    const isHold = !!event.approvalHold;
+    if (isHold) {
+      sound.playHoldAlert();
+    }
+
     set({
       agentStates: updatedStates,
       activeParticles: newParticles,
+      isApprovalModalOpen: isHold,
       selectedAgent: event.agent !== 'system' ? event.agent : get().selectedAgent
     });
   },
@@ -170,6 +177,20 @@ export const useObservatoryStore = create<ObservatoryStore>((set, get) => ({
       }
     } catch (err) {
       console.error('Error submitting live case to backend:', err);
+    }
+  },
+
+  triggerPatrolCheck: async () => {
+    if (get().streamMode === 'live' && get().isLiveConnected) {
+      try {
+        await fetch('/api/triggers/patrol', { method: 'POST' });
+        sound.playAgentPulse();
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      sound.playAgentPulse();
+      get().jumpToStep(13);
     }
   },
 
@@ -295,20 +316,70 @@ export const useObservatoryStore = create<ObservatoryStore>((set, get) => ({
     }, 4000);
   },
 
-  approveGate: () => {
+  approveGate: async (editedText?: string) => {
     sound.playSuccess();
     set({ isApprovalModalOpen: false });
-    get().jumpToStep(12);
+
+    if (get().streamMode === 'live' && get().isLiveConnected) {
+      try {
+        await fetch('/api/cases/run-rahul-0921/approvals/gate-rahul-fm01', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            decision: editedText ? 'edit' : 'approve',
+            coordinator_name: 'Lead Coordinator Alex V.',
+            edited_message: editedText
+          })
+        });
+      } catch (err) {
+        console.error('Failed to submit live approval:', err);
+      }
+    } else {
+      // Mock step jump to 12
+      get().jumpToStep(12);
+    }
   },
 
-  rejectGate: () => {
+  rejectGate: async () => {
     sound.playHoldAlert();
     set({ isApprovalModalOpen: false });
+
+    if (get().streamMode === 'live' && get().isLiveConnected) {
+      try {
+        await fetch('/api/cases/run-rahul-0921/approvals/gate-rahul-fm01', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            decision: 'reject',
+            coordinator_name: 'Lead Coordinator Alex V.'
+          })
+        });
+      } catch (err) {
+        console.error('Failed to submit live reject:', err);
+      }
+    }
   },
 
-  triggerSightingWebhook: () => {
+  triggerSightingWebhook: async (type = 'verified') => {
     sound.playHandoff();
-    get().jumpToStep(4);
+    if (get().streamMode === 'live' && get().isLiveConnected) {
+      try {
+        await fetch('/api/cases/run-rahul-0921/sightings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'Park Metro',
+            time: '5:15 PM',
+            description: 'Boy in royal blue shirt asking for directions near Station Concourse',
+            source: 'community_webhook'
+          })
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      get().jumpToStep(4);
+    }
   },
 
   resetRun: () => {

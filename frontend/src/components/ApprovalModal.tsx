@@ -62,7 +62,7 @@ export const ApprovalModal: React.FC = () => {
             />
           ) : (
             <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 text-xs font-mono text-slate-200 leading-relaxed italic">
-              "{editedMessage}"
+              "{editedMessage || holdData.preview.message}"
             </div>
           )}
         </div>
@@ -83,17 +83,17 @@ export const ApprovalModal: React.FC = () => {
         {/* Action Decision Buttons */}
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
           <button
-            onClick={rejectGate}
+            onClick={() => rejectGate()}
             className="px-4 py-2 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 hover:bg-red-900/50 text-xs font-mono font-semibold transition-all"
           >
             Reject & Revise
           </button>
 
           <button
-            onClick={approveGate}
+            onClick={() => approveGate(isEditing ? editedMessage : undefined)}
             className="px-5 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/30 text-xs font-mono font-bold shadow-[0_0_20px_rgba(0,255,157,0.3)] transition-all flex items-center gap-2"
           >
-            <span>Approve & Mobilize</span>
+            <span>{isEditing ? 'Save Edit & Mobilize' : 'Approve & Mobilize'}</span>
             <span>➔</span>
           </button>
         </div>
