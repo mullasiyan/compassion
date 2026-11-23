@@ -61,6 +61,25 @@ def get_case(case_id: str) -> Optional[Dict[str, Any]]:
             "created_at": row["created_at"]
         }
 
+def get_active_cases() -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM cases WHERE status = 'active' ORDER BY created_at DESC").fetchall()
+        return [
+            {
+                "case_id": r["case_id"],
+                "name": r["name"],
+                "age": r["age"],
+                "last_seen_time": r["last_seen_time"],
+                "last_seen_location": r["last_seen_location"],
+                "clothing": r["clothing"],
+                "details": json.loads(r["details_json"] or "{}"),
+                "urgency": r["urgency"],
+                "status": r["status"],
+                "created_at": r["created_at"]
+            }
+            for r in rows
+        ]
+
 # --- Blackboard: Task Helpers ---
 
 def create_task(task_id: str, case_id: str, title: str, assigned_to: str, priority: str = "medium"):
