@@ -1,5 +1,5 @@
 -- ====================================================================
--- LostLink SQLite Blackboard Database Schema
+-- LostLink SQLite Blackboard Database Schema (Step 5 Multi-Agent)
 -- ====================================================================
 
 PRAGMA foreign_keys = ON;
@@ -76,8 +76,41 @@ CREATE TABLE IF NOT EXISTS audit_log (
     FOREIGN KEY(case_id) REFERENCES cases(case_id) ON DELETE CASCADE
 );
 
+-- 6. Sightings Blackboard (Raw & Verified Sightings)
+CREATE TABLE IF NOT EXISTS sightings (
+    sighting_id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    location TEXT NOT NULL,
+    time TEXT NOT NULL,
+    description TEXT NOT NULL,
+    lat REAL,
+    lon REAL,
+    status TEXT NOT NULL CHECK(status IN ('pending', 'verified', 'flagged_duplicate', 'flagged_unverified')) DEFAULT 'pending',
+    confidence REAL DEFAULT 0.0,
+    critic_notes TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(case_id) REFERENCES cases(case_id) ON DELETE CASCADE
+);
+
+-- 7. Search Zones (Dynamic Spatial Perimeters)
+CREATE TABLE IF NOT EXISTS search_zones (
+    zone_id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    center_lat REAL NOT NULL,
+    center_lon REAL NOT NULL,
+    radius_m INTEGER NOT NULL,
+    priority TEXT NOT NULL CHECK(priority IN ('critical', 'high', 'medium', 'low')),
+    status TEXT NOT NULL CHECK(status IN ('active', 'decayed', 'cleared')) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(case_id) REFERENCES cases(case_id) ON DELETE CASCADE
+);
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_tasks_case_id ON tasks(case_id);
 CREATE INDEX IF NOT EXISTS idx_messages_case_id ON messages(case_id);
 CREATE INDEX IF NOT EXISTS idx_events_case_id ON events(case_id);
 CREATE INDEX IF NOT EXISTS idx_audit_case_id ON audit_log(case_id);
+CREATE INDEX IF NOT EXISTS idx_sightings_case_id ON sightings(case_id);
+CREATE INDEX IF NOT EXISTS idx_zones_case_id ON search_zones(case_id);

@@ -23,10 +23,12 @@ def init_db():
         conn.executescript(schema_sql)
         conn.commit()
 
+# --- Blackboard: Case Helpers ---
+
 def insert_case(case_data: Dict[str, Any]):
     with get_db() as conn:
         conn.execute(
-            """INSERT INTO cases (case_id, name, age, last_seen_time, last_seen_location, clothing, details_json, urgency, status)
+            """INSERT OR REPLACE INTO cases (case_id, name, age, last_seen_time, last_seen_location, clothing, details_json, urgency, status)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')""",
             (
                 case_data["case_id"],
@@ -41,10 +43,30 @@ def insert_case(case_data: Dict[str, Any]):
         )
         conn.commit()
 
+def get_case(case_id: str) -> Optional[Dict[str, Any]]:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,)).fetchone()
+        if not row:
+            return None
+        return {
+            "case_id": row["case_id"],
+            "name": row["name"],
+            "age": row["age"],
+            "last_seen_time": row["last_seen_time"],
+            "last_seen_location": row["last_seen_location"],
+            "clothing": row["clothing"],
+            "details": json.loads(row["details_json"] or "{}"),
+            "urgency": row["urgency"],
+            "status": row["status"],
+            "created_at": row["created_at"]
+        }
+
+# --- Blackboard: Task Helpers ---
+
 def create_task(task_id: str, case_id: str, title: str, assigned_to: str, priority: str = "medium"):
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO tasks (task_id, case_id, title, assigned_to, status, priority, progress) VALUES (?, ?, ?, ?, 'pending', ?, 0.0)",
+            "INSERT OR REPLACE INTO tasks (task_id, case_id, title, assigned_to, status, priority, progress) VALUES (?, ?, ?, ?, 'pending', ?, 0.0)",
             (task_id, case_id, title, assigned_to, priority)
         )
         conn.commit()
@@ -57,6 +79,13 @@ def update_task(task_id: str, status: str, progress: float = 0.0):
         )
         conn.commit()
 
+def get_tasks(case_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM tasks WHERE case_id = ? ORDER BY created_at ASC", (case_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+# --- Blackboard: Message & Particle Helpers ---
+
 def save_message(case_id: str, from_agent: str, to_agent: str, preview: str, full_payload: Dict[str, Any] = None):
     with get_db() as conn:
         conn.execute(
@@ -64,6 +93,86 @@ def save_message(case_id: str, from_agent: str, to_agent: str, preview: str, ful
             (case_id, from_agent, to_agent, preview, json.dumps(full_payload or {}))
         )
         conn.commit()
+
+# --- Blackboard: Sightings Helpers (Verification & Critic) ---
+
+def insert_sighting(sighting: Dict[str, Any]):
+    with get_db() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO sightings 
+               (sighting_id, case_id, source, location, time, description, lat, lon, status, confidence, critic_notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                sighting["sighting_id"],
+                sighting["case_id"],
+                sighting.get("source", "community_webhook"),
+                sighting["location"],
+                sighting["time"],
+                sighting["description"],
+                sighting.get("lat"),
+                sighting.get("lon"),
+                sighting.get("status", "pending"),
+                sighting.get("confidence", 0.0),
+                sighting.get("critic_notes", "")
+            )
+        )
+        conn.commit()
+
+def update_sighting_status(sighting_id: str, status: str, confidence: float, critic_notes: str, lat: float = None, lon: float = None):
+    with get_db() as conn:
+        if lat is not None and lon is not None:
+            conn.execute(
+                """UPDATE sightings 
+                   SET status = ?, confidence = ?, critic_notes = ?, lat = ?, lon = ?
+                   WHERE sighting_id = ?""",
+                (status, confidence, critic_notes, lat, lon, sighting_id)
+            )
+        else:
+            conn.execute(
+                """UPDATE sightings 
+                   SET status = ?, confidence = ?, critic_notes = ?
+                   WHERE sighting_id = ?""",
+                (status, confidence, critic_notes, sighting_id)
+            )
+        conn.commit()
+
+def get_sightings(case_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM sightings WHERE case_id = ? ORDER BY created_at ASC", (case_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+def get_verified_sightings(case_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM sightings WHERE case_id = ? AND status = 'verified' ORDER BY confidence DESC", (case_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+# --- Blackboard: Search Zones Helpers (Spatial Modeling) ---
+
+def upsert_search_zone(zone: Dict[str, Any]):
+    with get_db() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO search_zones 
+               (zone_id, case_id, name, center_lat, center_lon, radius_m, priority, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                zone["zone_id"],
+                zone["case_id"],
+                zone["name"],
+                zone["center_lat"],
+                zone["center_lon"],
+                zone["radius_m"],
+                zone["priority"],
+                zone.get("status", "active")
+            )
+        )
+        conn.commit()
+
+def get_search_zones(case_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM search_zones WHERE case_id = ? ORDER BY priority DESC", (case_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+# --- Blackboard: Event Stream & Audit Helpers ---
 
 def log_event(event_dict: Dict[str, Any]):
     """Records event matching the exact frontend ScriptedEvent shape."""
@@ -120,4 +229,4 @@ def get_events_by_case(case_id: str) -> List[Dict[str, Any]]:
 
 if __name__ == "__main__":
     init_db()
-    print("LostLink SQLite database initialized.")
+    print("LostLink SQLite database initialized with full Step 5 blackboard tables.")

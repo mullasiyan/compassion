@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from dotenv import load_dotenv
 
-from backend.database import init_db, insert_case, get_events_by_case
-from backend.agents.orchestrator import run_mission_workflow, sse_subscribers
+from backend.database import init_db, insert_case, get_events_by_case, get_search_zones
+from backend.agents.orchestrator import run_mission_workflow, handle_incoming_sighting, sse_subscribers
 
 load_dotenv()
 
@@ -44,6 +44,12 @@ class CaseIntakeRequest(BaseModel):
         "transit_route": "Bus 42B",
         "battery": "Low (Pinged at 4:45 PM)"
     })
+
+class SightingWebhookRequest(BaseModel):
+    location: str = Field(default="Park Metro")
+    time: str = Field(default="5:15 PM")
+    description: str = Field(default="Boy in royal blue shirt asking for directions near Station Concourse")
+    source: str = Field(default="community_webhook")
 
 @app.get("/api/health")
 def health_check():
@@ -86,6 +92,30 @@ async def submit_case(report: CaseIntakeRequest, background_tasks: BackgroundTas
         "message": f"Autonomous case pipeline initiated for {report.name}"
     }
 
+@app.post("/api/cases/{case_id}/sightings")
+async def submit_sighting(case_id: str, sighting: SightingWebhookRequest, background_tasks: BackgroundTasks):
+    """
+    Ingests an incoming sighting (via webhook or form).
+    Wakes the Orchestrator to decide verification, re-planning, and task re-assignment.
+    """
+    sighting_dict = sighting.dict()
+    background_tasks.add_task(handle_incoming_sighting, case_id, sighting_dict)
+
+    return {
+        "status": "received",
+        "case_id": case_id,
+        "sighting": sighting_dict,
+        "message": "Sighting ingested. Orchestrator awakened for verification and autonomous re-planning."
+    }
+
+@app.get("/api/cases/{case_id}/zones")
+def get_zones(case_id: str):
+    """
+    Returns active and decayed search zones for the Leaflet map.
+    """
+    zones = get_search_zones(case_id)
+    return {"case_id": case_id, "zones": zones}
+
 @app.get("/api/cases/{case_id}/events")
 def get_case_events(case_id: str):
     """
@@ -105,7 +135,6 @@ async def events_stream():
 
     async def event_generator():
         try:
-            # Yield initial connection confirmation
             yield {
                 "event": "connected",
                 "data": json.dumps({"status": "connected", "stream": "LostLink Agent Observatory SSE"})
@@ -126,4 +155,4 @@ async def events_stream():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
