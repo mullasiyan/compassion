@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ==================================================================== */
+  /* DESIGN TOKENS: LOSTLINK AGENT OBSERVATORY                            */
+  /* ==================================================================== */
+  --bg-deep-space: #03060E;
+  --bg-void: #060A17;
+  --bg-panel: rgba(9, 14, 28, 0.78);
+  --bg-panel-border: rgba(255, 255, 255, 0.08);
+
+  /* 6 Agent Signature Colors */
+  --agent-orchestrator: #00F0FF;
+  /* Electric Cyan (Commander) */
+  --agent-report: #38BDF8;
+  /* Sky Cyan (Intake & Urgency) */
+  --agent-verification: #FFB800;
+  /* Amber Gold (Critic & Sighting Auditor) */
+  --agent-search: #A855F7;
+  /* Ultra Violet (Spatial Strategist) */
+  --agent-rescue: #00FF9D;
+  /* Emerald Lime (Field Dispatcher) */
+  --agent-family: #FF007A;
+  /* Hyper Magenta (Family Liaison) */
+
+  /* System States */
+  --state-idle: #64748B;
+  --state-thinking: #00F0FF;
+  --state-working: #00FF9D;
+  --state-failed: #EF4444;
+  --state-done: #10B981;
+  --state-hold: #FFB800;
+
+  /* Typography Fallbacks */
+  --font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-deep-space);
+  color: #F8FAFC;
+  font-family: var(--font-body);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--bg-panel-border);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.55);
+}
+
+.glass-panel-glow {
+  background: var(--bg-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.glass-hold-glow {
+  background: rgba(22, 17, 7, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 184, 0, 0.45);
+  box-shadow: 0 0 45px rgba(255, 184, 0, 0.25), 0 16px 48px rgba(0, 0, 0, 0.8);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.pulse-glow {
+  animation: pulseGlow 2.5s infinite ease-in-out;
+}
